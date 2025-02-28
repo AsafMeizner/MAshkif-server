@@ -3,16 +3,16 @@ from pymongo.server_api import ServerApi
 import pymongo
 from config import config
 
-uri = config.get("MONGO_URI")
-
 def get_client():
-    return MongoClient(uri, server_api=ServerApi('1'))
+    # Always read the current URI from config.
+    return MongoClient(config.get("MONGO_URI"), server_api=ServerApi('1'))
 
 def get_db(db_name, create_if_not_exists=False):
     try:
         client = get_client()
         client.admin.command('ping')
         print("Connected to MongoDB!")
+        # Check if the database exists by listing current databases.
         if db_name not in client.list_database_names():
             if create_if_not_exists:
                 db = client[db_name]
@@ -21,6 +21,12 @@ def get_db(db_name, create_if_not_exists=False):
                 return None
         else:
             return client[db_name]
+    except pymongo.errors.ServerSelectionTimeoutError as e:
+        print(f"ServerSelectionTimeoutError: {e}")
+        return None
+    except pymongo.errors.ConnectionError as e:
+        print(f"ConnectionError: {e}")
+        return None
     except Exception as e:
         print(f"Error connecting to MongoDB: {e}")
         return None
@@ -34,6 +40,9 @@ def fetch_entries(db_name, collection_name):
         for entry in entries:
             entry['_id'] = str(entry['_id'])
         return entries, 200
+    except pymongo.errors.AutoReconnect as e:
+        print(f"AutoReconnect error: {e}")
+        return {'message': 'Database connection error'}, 500
     except Exception as e:
         print(f"Error fetching entries: {e}")
         return {'message': 'Error fetching entries'}, 500
@@ -62,6 +71,9 @@ def insert_entries(db_name, entries, collection_name, create_if_not_exists=False
             return {'message': 'Entries processed successfully', 'entryIds': inserted_ids}, 201
         else:
             return {'message': 'No new entries to process'}, 400
+    except pymongo.errors.AutoReconnect as e:
+        print(f"AutoReconnect error: {e}")
+        return {'message': 'Database connection error'}, 500
     except Exception as e:
         print(f"Error inserting entries: {e}")
         return {'message': 'Error inserting entries'}, 500
@@ -70,37 +82,20 @@ def insert_entries(db_name, entries, collection_name, create_if_not_exists=False
 
 def create_database(db_name):
     db = get_db(db_name, create_if_not_exists=True)
-    if db:
+    if db is not None:
         return db
     return None
 
 def create_collection(db_name, collection_name):
     db = get_db(db_name, create_if_not_exists=True)
-    if db:
+    if db is not None:
         try:
             db.create_collection(collection_name)
             return True
         except pymongo.errors.CollectionInvalid:
-            # Collection already exists
+            # Collection already exists: treat as success.
             return True
         except Exception as e:
             print(f"Error creating collection: {e}")
             return False
     return False
-
-def list_competitions():
-    try:
-        client = get_client()
-        return client.list_database_names()
-    except Exception as e:
-        print(f"Error listing competitions: {e}")
-        return []
-
-def list_collections(db_name):
-    try:
-        client = get_client()
-        db = client[db_name]
-        return db.list_collection_names()
-    except Exception as e:
-        print(f"Error listing collections for {db_name}: {e}")
-        return []

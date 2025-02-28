@@ -1,40 +1,117 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark-mode">
 <head>
-    <meta charset="UTF-8">
-    <title>Admin Login</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <meta charset="UTF-8">
+  <title>Admin Login</title>
+  <!-- Using default Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    /* Dark mode variables */
+    html.dark-mode {
+      --bg-color: #111217;
+      --container-bg: #181b1f;
+      --title-color: #e74c3c;
+      --text-color: #ffffff;
+      --input-bg: #3b3b3b;
+      --button-bg: #e74c3c;
+      --button-hover: #c0392b;
+    }
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-color);
+    }
+    .card {
+      background-color: var(--container-bg);
+      color: var(--text-color);
+    }
+    .card-header h4 {
+      color: var(--title-color);
+    }
+    .form-label,
+    .form-text {
+      color: var(--text-color);
+    }
+    input.form-control, select.form-select {
+      background-color: var(--input-bg);
+      color: var(--text-color);
+      border: 1px solid var(--input-bg);
+    }
+    /* Keep dark inputs on focus with a white border */
+    html.dark-mode input.form-control:focus,
+    html.dark-mode select.form-select:focus {
+      background-color: var(--input-bg);
+      border: 1px solid #ffffff;
+      box-shadow: none;
+    }
+    .btn-custom {
+      background-color: var(--button-bg);
+      border: 1px solid var(--button-bg);
+      color: var(--text-color);
+    }
+    .btn-custom:hover {
+      background-color: var(--button-hover);
+      border-color: var(--button-hover);
+      color: var(--text-color);
+    }
+    /* Style the toggle-password buttons to match red buttons */
+    .toggle-password {
+      cursor: pointer;
+      background-color: var(--button-bg);
+      border: 1px solid var(--button-bg);
+      color: var(--text-color);
+      padding: 0.375rem 0.75rem;
+      border-radius: 0.25rem;
+    }
+  </style>
 </head>
-<body class="bg-light">
-<div class="container mt-5">
+<body>
+  <div class="container mt-5">
     <div class="row justify-content-center">
-        <div class="col-md-4">
-            <div class="card">
-                <div class="card-header text-center">
-                    <h4>Admin Login</h4>
+      <div class="col-md-4">
+        <div class="card p-3">
+          <div class="card-header text-center">
+            <h4>Admin Login</h4>
+          </div>
+          <div class="card-body">
+            {% with messages = get_flashed_messages() %}
+              {% if messages %}
+                <div class="alert alert-danger">
+                  {% for message in messages %}
+                    <div>{{ message }}</div>
+                  {% endfor %}
                 </div>
-                <div class="card-body">
-                    {% with messages = get_flashed_messages() %}
-                      {% if messages %}
-                        <div class="alert alert-danger">
-                          {% for message in messages %}
-                            <div>{{ message }}</div>
-                          {% endfor %}
-                        </div>
-                      {% endif %}
-                    {% endwith %}
-                    <form method="POST">
-                        <div class="mb-3">
-                            <label for="password" class="form-label">Password:</label>
-                            <input type="password" class="form-control" name="password" required>
-                        </div>
-                        <button type="submit" class="btn btn-primary w-100">Login</button>
-                    </form>
+              {% endif %}
+            {% endwith %}
+            <form method="POST">
+              <div class="mb-3">
+                <label for="login-password" class="form-label">Password:</label>
+                <div class="input-group">
+                  <input type="password" class="form-control" name="password" id="login-password" required>
+                  <span class="input-group-text toggle-password" onclick="toggleLoginPassword()">Show</span>
                 </div>
-            </div>
+              </div>
+              <button type="submit" class="btn btn-custom w-100">Login</button>
+            </form>
+          </div>
         </div>
+      </div>
     </div>
-</div>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  </div>
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    // Toggle visibility for login password
+    function toggleLoginPassword() {
+      var input = document.getElementById('login-password');
+      var toggle = document.querySelector('.toggle-password');
+      if (input.type === "password") {
+        input.type = "text";
+        toggle.textContent = "Hide";
+      } else {
+        input.type = "password";
+        toggle.textContent = "Show";
+      }
+    }
+  </script>
 </body>
 </html>

@@ -1,12 +1,11 @@
 from flask import Flask, request, jsonify, render_template, redirect, url_for, session, flash
 from flask_cors import CORS
-from db_handler import (fetch_entries, insert_entries, create_database, create_collection,
-                        list_competitions, list_collections)
+from db_handler import fetch_entries, insert_entries, create_database, create_collection
 from config import config, save_config
-import os
 
 app = Flask(__name__)
-app.secret_key = config.get("SECRET_KEY", "dev")
+# Use a hard-coded secret key for session management.
+app.secret_key = "default_secret_key"
 CORS(app)
 
 def check_password(provided):
@@ -61,7 +60,7 @@ def admin_login():
     if request.method == 'POST':
         password = request.form.get('password')
         admin_details = config.get('passwords', {}).get('admin')
-        if admin_details and password == admin_details.get('password'):
+        if admin_details and password == admin_details.get("password"):
             session['admin_logged_in'] = True
             return redirect(url_for('admin_dashboard'))
         else:
@@ -85,8 +84,7 @@ def admin_required(func):
 @app.route('/admin')
 @admin_required
 def admin_dashboard():
-    competitions = list_competitions()
-    return render_template('admin_dashboard.html', config=config, competitions=competitions)
+    return render_template('admin_dashboard.html', config=config)
 
 @app.route('/admin/update_config', methods=['POST'])
 @admin_required
@@ -108,12 +106,20 @@ def update_config():
                 config['passwords'][key]['competitions'] = comps
             else:
                 config['passwords'][key]['competitions'] = "all"
-    new_secret = request.form.get('secret_key')
-    if new_secret:
-        config['SECRET_KEY'] = new_secret
-        app.secret_key = new_secret
     save_config(config)
     flash('Configuration updated successfully.')
+    return redirect(url_for('admin_dashboard'))
+
+@app.route('/admin/delete_password', methods=['POST'])
+@admin_required
+def delete_password():
+    delete_key = request.form.get('delete_key')
+    if delete_key in config.get('passwords', {}):
+        del config['passwords'][delete_key]
+        save_config(config)
+        flash(f'Password entry for "{delete_key}" deleted successfully.')
+    else:
+        flash(f'No password entry found for key "{delete_key}".')
     return redirect(url_for('admin_dashboard'))
 
 @app.route('/admin/add_password', methods=['POST'])
@@ -139,40 +145,28 @@ def add_password():
     flash(f'Password entry for "{new_key}" added successfully.')
     return redirect(url_for('admin_dashboard'))
 
-@app.route('/admin/create_database', methods=['POST'])
+@app.route('/admin/create_competition', methods=['POST'])
 @admin_required
-def admin_create_database():
+def admin_create_competition():
     competition_id = request.form.get('competition_id')
+    collections_input = request.form.get('collections')  # Optional comma-separated list
     if not competition_id:
         flash('Competition ID is required.')
         return redirect(url_for('admin_dashboard'))
     db = create_database(competition_id)
-    if db:
-        flash(f'Competition database "{competition_id}" created successfully.')
+    if db is not None:
+        flash(f'Competition "{competition_id}" created successfully.')
+        if collections_input:
+            collections = [c.strip() for c in collections_input.split(',') if c.strip()]
+            for coll in collections:
+                result = create_collection(competition_id, coll)
+                if result:
+                    flash(f'Collection "{coll}" created in competition "{competition_id}".')
+                else:
+                    flash(f'Failed to create collection "{coll}" in competition "{competition_id}".')
     else:
-        flash(f'Failed to create competition database "{competition_id}".')
+        flash(f'Failed to create competition "{competition_id}".')
     return redirect(url_for('admin_dashboard'))
-
-@app.route('/admin/create_collection', methods=['POST'])
-@admin_required
-def admin_create_collection():
-    competition_id = request.form.get('competition_id')
-    collection_name = request.form.get('collection_name')
-    if not (competition_id and collection_name):
-        flash('Competition ID and collection name are required.')
-        return redirect(url_for('admin_dashboard'))
-    result = create_collection(competition_id, collection_name)
-    if result:
-        flash(f'Collection "{collection_name}" created successfully in competition "{competition_id}".')
-    else:
-        flash(f'Failed to create collection "{collection_name}" in competition "{competition_id}".')
-    return redirect(url_for('admin_dashboard'))
-
-@app.route('/admin/collections/<competition_id>')
-@admin_required
-def get_collections(competition_id):
-    collections = list_collections(competition_id)
-    return jsonify(collections)
 
 @app.after_request
 def add_cors_headers(response):

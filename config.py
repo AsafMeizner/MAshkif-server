@@ -3,28 +3,28 @@ import json
 
 CONFIG_FILE = 'config.json'
 
+DEFAULT_CONFIG = {
+    "MONGO_URI": "<mongo-uri-here>",
+    "passwords": {
+        "admin": {
+            "password": "admin123",  # default admin password
+            "permissions": "read-write",  # full permissions for admin GUI
+            "competitions": "all"
+        },
+        "normal": {
+            "password": "user123",  # default normal password
+            "permissions": "read-write",  # adjust as needed; could be read-only
+            "competitions": "all"
+        }
+    }
+}
+
 def load_config():
     if os.path.exists(CONFIG_FILE):
         with open(CONFIG_FILE, 'r') as f:
             config = json.load(f)
     else:
-        # Use environment variables (or .env via os.environ) to generate default config.
-        config = {
-            "MONGO_URI": os.environ.get("MONGODB_URI"),
-            "passwords": {
-                "admin": {
-                    "password": os.environ.get("admin_password"),
-                    "permissions": "read-write",  # full permissions for admin GUI
-                    "competitions": "all"
-                },
-                "normal": {
-                    "password": os.environ.get("password"),
-                    "permissions": "read-write",  # adjust as needed; could be read-only
-                    "competitions": "all"
-                }
-            },
-            "SECRET_KEY": os.environ.get("SECRET_KEY", "dev")
-        }
+        config = DEFAULT_CONFIG.copy()
         with open(CONFIG_FILE, 'w') as f:
             json.dump(config, f, indent=4)
     return config
