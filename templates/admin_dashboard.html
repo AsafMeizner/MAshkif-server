@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+      .toggle-password { cursor: pointer; }
+    </style>
+</head>
+<body class="bg-light">
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center">
+        <h2>Admin Dashboard</h2>
+        <a href="{{ url_for('admin_logout') }}" class="btn btn-outline-secondary">Logout</a>
+    </div>
+    <hr>
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <div class="alert alert-info">
+          {% for message in messages %}
+            <div>{{ message }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    <!-- Update Configuration -->
+    <div class="card mb-4">
+        <div class="card-header">
+            Update Configuration
+        </div>
+        <div class="card-body">
+            <form action="{{ url_for('update_config') }}" method="POST">
+                <div class="mb-3">
+                    <label for="mongo_uri" class="form-label">Mongo URI</label>
+                    <input type="text" class="form-control" name="mongo_uri" value="{{ config['MONGO_URI'] }}">
+                </div>
+                <div class="mb-3">
+                    <label for="secret_key" class="form-label">Secret Key</label>
+                    <input type="text" class="form-control" name="secret_key" value="{{ config['SECRET_KEY'] }}">
+                </div>
+                <h5>Passwords</h5>
+                {% for key, details in config['passwords'].items() %}
+                    <div class="mb-3">
+                        <label class="form-label">{{ key }} Password</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" name="passwords-{{ key }}-password" value="{{ details['password'] }}">
+                            <span class="input-group-text toggle-password">Show</span>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Permissions</label>
+                        <select class="form-select" name="passwords-{{ key }}-permissions">
+                            <option value="read-only" {% if details['permissions'] == 'read-only' %}selected{% endif %}>Read Only</option>
+                            <option value="write-only" {% if details['permissions'] == 'write-only' %}selected{% endif %}>Write Only</option>
+                            <option value="read-write" {% if details['permissions'] == 'read-write' %}selected{% endif %}>Read & Write</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Competitions</label>
+                        <input type="text" class="form-control" name="passwords-{{ key }}-competitions" value="{{ details['competitions'] if details['competitions'] != 'all' else 'all' }}">
+                        <div class="form-text">Enter comma separated competition IDs or "all"</div>
+                    </div>
+                    <hr>
+                {% endfor %}
+                <button type="submit" class="btn btn-primary">Update Configuration</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add New Password -->
+    <div class="card mb-4">
+        <div class="card-header">
+            Add New Password
+        </div>
+        <div class="card-body">
+            <form action="{{ url_for('add_password') }}" method="POST">
+                <div class="mb-3">
+                    <label class="form-label">Identifier (Key)</label>
+                    <input type="text" class="form-control" name="new_key" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Password</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control" name="new_password" required>
+                        <span class="input-group-text toggle-password">Show</span>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Permissions</label>
+                    <select class="form-select" name="new_permissions" required>
+                        <option value="read-only">Read Only</option>
+                        <option value="write-only">Write Only</option>
+                        <option value="read-write" selected>Read & Write</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Competitions</label>
+                    <input type="text" class="form-control" name="new_competitions" value="all">
+                    <div class="form-text">Enter comma separated competition IDs or "all"</div>
+                </div>
+                <button type="submit" class="btn btn-success">Add Password</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Create Competition Database -->
+    <div class="card mb-4">
+        <div class="card-header">
+            Create Competition Database
+        </div>
+        <div class="card-body">
+            <form action="{{ url_for('admin_create_database') }}" method="POST">
+                <div class="mb-3">
+                    <label class="form-label">Competition ID</label>
+                    <input type="text" class="form-control" name="competition_id" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Create Database</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Create Collection -->
+    <div class="card mb-4">
+        <div class="card-header">
+            Create Collection
+        </div>
+        <div class="card-body">
+            <form action="{{ url_for('admin_create_collection') }}" method="POST" id="create-collection-form">
+                <div class="mb-3">
+                    <label class="form-label">Select Competition</label>
+                    <select class="form-select" name="competition_id" id="competition-select" required>
+                        <option value="">Select Competition</option>
+                        {% for comp in competitions %}
+                            <option value="{{ comp }}">{{ comp }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Available Collections</label>
+                    <select class="form-select" id="collections-dropdown" disabled>
+                        <option value="">Select Competition first</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">New Collection Name</label>
+                    <input type="text" class="form-control" name="collection_name" required>
+                </div>
+                <button type="submit" class="btn btn-warning">Create Collection</button>
+            </form>
+        </div>
+    </div>
+</div>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    // Toggle password visibility in input groups
+    $('.toggle-password').on('click', function() {
+        var input = $(this).siblings('input');
+        if(input.attr('type') === 'text') {
+            input.attr('type', 'password');
+            $(this).text('Show');
+        } else {
+            input.attr('type', 'text');
+            $(this).text('Hide');
+        }
+    });
+
+    // Auto-detect collections for selected competition
+    $('#competition-select').on('change', function() {
+        var competition_id = $(this).val();
+        if (competition_id) {
+            $.getJSON('/admin/collections/' + competition_id, function(data) {
+                var dropdown = $('#collections-dropdown');
+                dropdown.empty();
+                if (data.length > 0) {
+                    $.each(data, function(index, value) {
+                        dropdown.append($('<option></option>').attr('value', value).text(value));
+                    });
+                    dropdown.prop('disabled', false);
+                } else {
+                    dropdown.append($('<option></option>').attr('value', '').text('No collections available'));
+                    dropdown.prop('disabled', true);
+                }
+            });
+        } else {
+            $('#collections-dropdown').empty().append($('<option></option>').attr('value', '').text('Select Competition first')).prop('disabled', true);
+        }
+    });
+</script>
+</body>
+</html>
