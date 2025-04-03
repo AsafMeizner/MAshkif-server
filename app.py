@@ -2,10 +2,11 @@ from flask import Flask, request, jsonify, render_template, redirect, url_for, s
 from flask_cors import CORS
 from db_handler import fetch_entries, insert_entries, create_database, create_collection
 from config import config, save_config
+import os
+import requests
 
 app = Flask(__name__)
-# Use a hard-coded secret key for session management.
-app.secret_key = "default_secret_key"
+app.secret_key = os.urandom(24)
 CORS(app)
 
 def check_password(provided):
@@ -53,6 +54,144 @@ def handle_entries(competition_id, collection_name):
         )
         return jsonify(insert_result), status_code
 
+# --- API Route for Teams ---
+
+@app.route('/<competition_id>/teams', methods=['GET'])
+def get_teams(competition_id):
+    password = request.headers.get('x-password')
+    role, details = check_password(password)
+    if role is None:
+        return jsonify({'message': 'Forbidden: Invalid password'}), 403
+
+    allowed_comps = details.get('competitions')
+    if allowed_comps != "all" and competition_id not in allowed_comps:
+        return jsonify({'message': 'Forbidden: Access to this competition is not allowed'}), 403
+
+    if details.get('permissions') not in ['read-only', 'read-write']:
+        return jsonify({'message': 'Forbidden: Read permission required'}), 403
+
+    # Get TBA API key from config
+    tba_key = config.get('tba_key')
+    if not tba_key:
+        return jsonify({'message': 'TBA API key not configured'}), 500
+
+    # Get event key from query parameters or use competition_id as event key
+    event_key = request.args.get('event_key', competition_id)
+    
+    # Check if we have cached teams in the database
+    try:
+        # Try to fetch teams from the database first
+        teams_data, status_code = fetch_entries(competition_id, 'teams')
+        if status_code == 200 and teams_data:
+            # Format teams as strings in the format "number - nickname"
+            formatted_teams = []
+            for team in teams_data:
+                if isinstance(team, dict) and 'team_number' in team and 'nickname' in team:
+                    formatted_teams.append(f"{team['team_number']} - {team['nickname']}")
+                elif isinstance(team, str):
+                    formatted_teams.append(team)
+            
+            if formatted_teams:
+                return jsonify(formatted_teams), 200
+    except Exception as e:
+        print(f"Error fetching teams from database: {str(e)}")
+    
+    # If we don't have cached teams, try to fetch from TBA API
+    try:
+        headers = {'X-TBA-Auth-Key': tba_key}
+        url = f'https://www.thebluealliance.com/api/v3/event/{event_key}/teams/simple'
+        
+        # Log the request details (without the API key)
+        print(f"Making TBA API request to: {url}")
+        
+        response = requests.get(url, headers=headers)
+        
+        # Log the response status and headers
+        print(f"TBA API response status: {response.status_code}")
+        print(f"TBA API response headers: {dict(response.headers)}")
+        
+        if response.status_code == 200:
+            teams = response.json()
+            # Format teams as strings in the format "number - nickname"
+            formatted_teams = [f"{team['team_number']} - {team['nickname']}" for team in teams]
+            
+            # Store teams in the database for future use
+            try:
+                insert_entries(competition_id, teams, 'teams', create_if_not_exists=True)
+            except Exception as e:
+                print(f"Error storing teams in database: {str(e)}")
+            
+            return jsonify(formatted_teams), 200
+        elif response.status_code == 304:
+            # Not modified, use cached data if available
+            return jsonify({'message': 'Not modified, use cached data'}), 304
+        elif response.status_code == 401:
+            # Log the error response
+            print(f"TBA API error response: {response.text}")
+            return jsonify({'message': 'TBA API authentication failed. Please check your API key.'}), 401
+        elif response.status_code == 403:
+            # Log the error response
+            print(f"TBA API error response: {response.text}")
+            return jsonify({'message': 'TBA API access forbidden. Please check your API key permissions.'}), 403
+        elif response.status_code == 404:
+            return jsonify({'message': 'Event not found in TBA'}), 404
+        else:
+            # Log the error response
+            print(f"TBA API error response: {response.text}")
+            return jsonify({'message': f'TBA API error: {response.status_code}'}), response.status_code
+    except Exception as e:
+        print(f"Exception in get_teams: {str(e)}")
+        return jsonify({'message': f'Error fetching teams: {str(e)}'}), 500
+    
+    # If all else fails, return a default list of teams
+    default_teams = [
+        "1234 - Example Team 1",
+        "5678 - Example Team 2",
+        "9012 - Example Team 3"
+    ]
+    return jsonify(default_teams), 200
+
+@app.route('/<competition_id>/teams', methods=['POST'])
+def add_teams(competition_id):
+    password = request.headers.get('x-password')
+    role, details = check_password(password)
+    if role is None:
+        return jsonify({'message': 'Forbidden: Invalid password'}), 403
+
+    allowed_comps = details.get('competitions')
+    if allowed_comps != "all" and competition_id not in allowed_comps:
+        return jsonify({'message': 'Forbidden: Access to this competition is not allowed'}), 403
+
+    if details.get('permissions') not in ['write-only', 'read-write']:
+        return jsonify({'message': 'Forbidden: Write permission required'}), 403
+
+    data = request.json
+    teams_list = data.get('teams', [])
+    
+    if not isinstance(teams_list, list):
+        return jsonify({'message': 'Invalid request: teams should be an array'}), 400
+    
+    # Format teams if they're not already in the correct format
+    formatted_teams = []
+    for team in teams_list:
+        if isinstance(team, str):
+            formatted_teams.append(team)
+        elif isinstance(team, dict):
+            if 'team_number' in team and 'nickname' in team:
+                formatted_teams.append(f"{team['team_number']} - {team['nickname']}")
+            else:
+                return jsonify({'message': 'Invalid team format. Each team must have team_number and nickname'}), 400
+        else:
+            return jsonify({'message': 'Invalid team format'}), 400
+    
+    # Store teams in the database
+    insert_result, status_code = insert_entries(
+        competition_id, formatted_teams, 'teams',
+        create_if_not_exists=(details.get('permissions') == 'read-write')
+    )
+    
+    return jsonify(insert_result), status_code
+
 # --- Admin GUI Routes ---
 
 @app.route('/admin/login', methods=['GET', 'POST'])
@@ -92,6 +231,11 @@ def update_config():
     new_mongo_uri = request.form.get('mongo_uri')
     if new_mongo_uri:
         config['MONGO_URI'] = new_mongo_uri
+    
+    new_tba_key = request.form.get('tba_key')
+    if new_tba_key:
+        config['tba_key'] = new_tba_key
+        
     for key in config.get('passwords', {}):
         new_pass = request.form.get(f'passwords-{key}-password')
         new_perm = request.form.get(f'passwords-{key}-permissions')
@@ -176,4 +320,4 @@ def add_cors_headers(response):
     return response
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=True) 

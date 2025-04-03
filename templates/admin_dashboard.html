@@ -88,6 +88,11 @@
             <label for="mongo_uri" class="form-label">Mongo URI</label>
             <input type="text" class="form-control" name="mongo_uri" value="{{ config['MONGO_URI'] }}">
           </div>
+          <div class="mb-3">
+            <label for="tba_key" class="form-label">The Blue Alliance API Key</label>
+            <input type="text" class="form-control" name="tba_key" value="{{ config['tba_key'] }}">
+            <div class="form-text">Used for fetching team data from The Blue Alliance</div>
+          </div>
           <h5>Passwords</h5>
           {% for key, details in config['passwords'].items() %}
             <div class="mb-3">
@@ -209,4 +214,4 @@
     }
   </script>
 </body>
-</html>
+</html> 
