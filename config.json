@@ -1,5 +1,6 @@
 {
     "MONGO_URI": null,
+    "tba_key": null,
     "passwords": {
         "admin": {
             "password": "admin",
