@@ -2,12 +2,12 @@
     "MONGO_URI": null,
     "passwords": {
         "admin": {
-            "password": "ASAF1511",
+            "password": "admin",
             "permissions": "read-write",
             "competitions": "all"
         },
         "normal": {
-            "password": "team5951",
+            "password": "user",
             "permissions": "read-write",
             "competitions": "all"
         }
