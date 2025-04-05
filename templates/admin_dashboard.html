@@ -38,6 +38,9 @@
     .form-label, .form-text {
       color: var(--text-color);
     }
+    .form-check-label {
+      color: var(--text-color);
+    }
     input.form-control, select.form-select {
       background-color: var(--input-bg);
       color: var(--text-color);
@@ -340,6 +343,15 @@
                           </select>
                         </div>
                         <div class="mb-3">
+                          <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="passwords-{{ key }}-bypass_restrictions" id="bypass{{ key }}" {% if details.get('bypass_restrictions', False) %}checked{% endif %}>
+                            <label class="form-check-label" for="bypass{{ key }}">
+                              Bypass Date Restrictions
+                            </label>
+                            <div class="form-text">When enabled, this user can submit entries outside of competition dates</div>
+                          </div>
+                        </div>
+                        <div class="mb-3">
                           <label class="form-label">Competitions</label>
                           <div class="dropdown">
                             <button class="btn btn-custom dropdown-toggle w-100 text-start" type="button" id="compDropdown{{ key }}" data-bs-toggle="dropdown" aria-expanded="false">
@@ -406,6 +418,15 @@
                       <option value="write-only">Write Only</option>
                       <option value="read-write" selected>Read & Write</option>
                     </select>
+                  </div>
+                  <div class="mb-3">
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" name="new_bypass_restrictions" id="newBypass">
+                      <label class="form-check-label" for="newBypass">
+                        Bypass Date Restrictions
+                      </label>
+                      <div class="form-text">When enabled, this user can submit entries outside of competition dates</div>
+                    </div>
                   </div>
                   <div class="mb-3">
                     <label class="form-label">Competitions</label>

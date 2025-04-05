@@ -8,6 +8,7 @@ import logging
 from datetime import datetime
 import json
 from ip2geotools.databases.noncommercial import DbIpCity
+import time
 
 # Configure logging
 logging.basicConfig(
@@ -29,6 +30,62 @@ def check_password(provided):
         if provided == details.get("password"):
             return key, details
     return None, None
+
+def get_event_details(event_key):
+    """Fetch event details from TBA API"""
+    tba_key = config.get('tba_key')
+    if not tba_key:
+        return None, "TBA API key not configured"
+    
+    try:
+        headers = {'X-TBA-Auth-Key': tba_key}
+        url = f'https://www.thebluealliance.com/api/v3/event/{event_key}/simple'
+        response = requests.get(url, headers=headers)
+        
+        if response.status_code == 200:
+            return response.json(), None
+        elif response.status_code == 304:
+            return None, "Event not modified"
+        elif response.status_code == 401:
+            return None, "TBA API authentication failed"
+        elif response.status_code == 404:
+            return None, "Event not found"
+        else:
+            return None, f"TBA API error: {response.status_code}"
+    except Exception as e:
+        return None, f"Error fetching event details: {str(e)}"
+
+def is_submission_valid(event_details, submission_time):
+    """Check if submission time is within event dates"""
+    if not event_details:
+        logger.error("No event details available")
+        return False
+    
+    try:
+        # Convert submission time from milliseconds to seconds
+        submission_time_seconds = submission_time / 1000
+        
+        # Parse dates
+        start_date = datetime.strptime(event_details['start_date'], '%Y-%m-%d')
+        end_date = datetime.strptime(event_details['end_date'], '%Y-%m-%d')
+        submission_date = datetime.fromtimestamp(submission_time_seconds)
+        
+        # Set start date to beginning of day
+        start_date = start_date.replace(hour=0, minute=0, second=0, microsecond=0)
+        # Set end date to end of day
+        end_date = end_date.replace(hour=23, minute=59, second=59, microsecond=999999)
+        
+        logger.info(f"Event dates - Start: {start_date}, End: {end_date}")
+        logger.info(f"Submission date: {submission_date}")
+        logger.info(f"Submission timestamp: {submission_time} ({submission_time_seconds})")
+        
+        is_valid = start_date <= submission_date <= end_date
+        logger.info(f"Validation result: {is_valid}")
+        
+        return is_valid
+    except Exception as e:
+        logger.error(f"Error validating submission time: {str(e)}")
+        return False
 
 # --- API Routes for Competition Entries ---
 
@@ -73,17 +130,68 @@ def handle_entries(competition_id, collection_name):
         if details.get('permissions') not in ['write-only', 'read-write']:
             logger.warning(f"Unauthorized write attempt - IP: {client_ip}, Country: {country}, Role: {role}")
             return jsonify({'message': 'Forbidden: Write permission required'}), 403
+        
         data = request.json
         entries_list = data.get('entries', [])
         if not isinstance(entries_list, list):
             logger.warning(f"Invalid entries format - IP: {client_ip}, Country: {country}")
             return jsonify({'message': 'Invalid request: entries should be an array'}), 400
-        insert_result, status_code = insert_entries(
-            competition_id, entries_list, collection_name,
-            create_if_not_exists=(details.get('permissions') == 'read-write')
-        )
-        logger.info(f"Entries inserted successfully - IP: {client_ip}, Country: {country}, Competition ID: {competition_id}, Role: {role}, Entries Count: {len(entries_list)}")
-        return jsonify(insert_result), status_code
+        
+        # Get event details and check if bypass is enabled
+        event_details, error = get_event_details(competition_id)
+        bypass_restrictions = details.get('bypass_restrictions', False)
+        
+        if not bypass_restrictions and not event_details:
+            logger.error(f"Error getting event details: {error}")
+            return jsonify({'message': f'Error validating event dates: {error}'}), 400
+        
+        logger.info(f"Event details: {event_details}")
+        logger.info(f"Bypass restrictions: {bypass_restrictions}")
+        
+        # Filter entries based on submission time if bypass is not enabled
+        valid_entries = []
+        invalid_entries = []
+        
+        for entry in entries_list:
+            # Extract team number from the string if it's in "number - name" format
+            team_number = entry.get('teamNumber', '')
+            if isinstance(team_number, str) and ' - ' in team_number:
+                try:
+                    team_number = int(team_number.split(' - ')[0])
+                    entry['teamNumber'] = team_number
+                except (ValueError, IndexError):
+                    logger.warning(f"Invalid team number format: {team_number}")
+                    invalid_entries.append(entry)
+                    continue
+            
+            submission_time = entry.get('submissionTime', 0)
+            logger.info(f"Processing entry - Team: {team_number}, Submission time: {submission_time}")
+            
+            if bypass_restrictions or is_submission_valid(event_details, submission_time):
+                valid_entries.append(entry)
+            else:
+                invalid_entries.append(entry)
+        
+        # Insert valid entries if there are any
+        if valid_entries:
+            insert_result, status_code = insert_entries(
+                competition_id, valid_entries, collection_name,
+                create_if_not_exists=(details.get('permissions') == 'read-write')
+            )
+            
+            # Add information about invalid entries if any
+            if invalid_entries:
+                insert_result['invalid_entries'] = len(invalid_entries)
+                insert_result['message'] = f"Processed {len(valid_entries)} entries, {len(invalid_entries)} entries were outside event dates"
+            
+            logger.info(f"Entries processed - IP: {client_ip}, Country: {country}, Competition ID: {competition_id}, Role: {role}, Valid: {len(valid_entries)}, Invalid: {len(invalid_entries)}")
+            return jsonify(insert_result), 200
+        else:
+            logger.warning(f"No valid entries found. Total entries: {len(entries_list)}, Invalid: {len(invalid_entries)}")
+            return jsonify({
+                'message': 'No valid entries to process',
+                'invalid_entries': len(invalid_entries)
+            }), 400
 
 # --- API Route for Teams ---
 
@@ -275,6 +383,7 @@ def update_config():
         new_pass = request.form.get(f'passwords-{key}-password')
         new_perm = request.form.get(f'passwords-{key}-permissions')
         new_comps = request.form.getlist(f'passwords-{key}-competitions')  # Changed to getlist for multiple values
+        new_bypass = request.form.get(f'passwords-{key}-bypass_restrictions') == 'on'
         if new_pass:
             config['passwords'][key]['password'] = new_pass
         if new_perm:
@@ -284,6 +393,7 @@ def update_config():
                 config['passwords'][key]['competitions'] = "all"
             else:
                 config['passwords'][key]['competitions'] = new_comps
+        config['passwords'][key]['bypass_restrictions'] = new_bypass
     
     save_config(config)
     reload_config()
@@ -310,6 +420,7 @@ def add_password():
     new_pass = request.form.get('new_password')
     new_perm = request.form.get('new_permissions')
     new_comps = request.form.getlist('new_competitions')  # Changed to getlist for multiple values
+    new_bypass = request.form.get('new_bypass_restrictions') == 'on'
     if not (new_key and new_pass and new_perm):
         flash('Missing required fields for new password.')
         return redirect(url_for('admin_dashboard'))
@@ -322,7 +433,8 @@ def add_password():
     config['passwords'][new_key] = {
         "password": new_pass,
         "permissions": new_perm,
-        "competitions": comps
+        "competitions": comps,
+        "bypass_restrictions": new_bypass
     }
     save_config(config)
     reload_config()
