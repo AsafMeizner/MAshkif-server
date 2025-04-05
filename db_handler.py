@@ -2,10 +2,35 @@ from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
 import pymongo
 from config import config
+import socket
 
 def get_client():
-    # Always read the current URI from config.
-    return MongoClient(config.get("MONGO_URI"), server_api=ServerApi('1'))
+    try:
+        # Set a longer timeout for DNS resolution and connection
+        client = MongoClient(
+            config.get("MONGO_URI"),
+            server_api=ServerApi('1'),
+            connectTimeoutMS=30000,  # 30 seconds
+            socketTimeoutMS=30000,   # 30 seconds
+            serverSelectionTimeoutMS=30000,  # 30 seconds
+            retryWrites=True,
+            retryReads=True
+        )
+        # Test the connection
+        client.admin.command('ping')
+        return client
+    except pymongo.errors.ServerSelectionTimeoutError as e:
+        print(f"ServerSelectionTimeoutError: {e}")
+        return None
+    except pymongo.errors.ConnectionError as e:
+        print(f"ConnectionError: {e}")
+        return None
+    except socket.gaierror as e:
+        print(f"DNS resolution error: {e}")
+        return None
+    except Exception as e:
+        print(f"Error connecting to MongoDB: {e}")
+        return None
 
 def get_db(db_name, create_if_not_exists=False):
     try:
