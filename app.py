@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify, render_template, redirect, url_for, session, flash
 from flask_cors import CORS
-from db_handler import fetch_entries, insert_entries, create_database, create_collection
-from config import config, save_config
+from db_handler import fetch_entries, insert_entries, create_database, create_collection, get_all_competitions
+from config import config, save_config, reload_config
 import os
 import requests
 import logging
@@ -254,7 +254,8 @@ def admin_required(func):
 @app.route('/admin')
 @admin_required
 def admin_dashboard():
-    return render_template('admin_dashboard.html', config=config)
+    competitions, _ = get_all_competitions()
+    return render_template('admin_dashboard.html', config=config, competitions=competitions)
 
 @app.route('/admin/update_config', methods=['POST'])
 @admin_required
@@ -270,18 +271,19 @@ def update_config():
     for key in config.get('passwords', {}):
         new_pass = request.form.get(f'passwords-{key}-password')
         new_perm = request.form.get(f'passwords-{key}-permissions')
-        new_comps = request.form.get(f'passwords-{key}-competitions')
+        new_comps = request.form.getlist(f'passwords-{key}-competitions')  # Changed to getlist for multiple values
         if new_pass:
             config['passwords'][key]['password'] = new_pass
         if new_perm:
             config['passwords'][key]['permissions'] = new_perm
         if new_comps:
-            if new_comps.strip().lower() != 'all':
-                comps = [c.strip() for c in new_comps.split(',') if c.strip()]
-                config['passwords'][key]['competitions'] = comps
-            else:
+            if 'all' in new_comps:
                 config['passwords'][key]['competitions'] = "all"
+            else:
+                config['passwords'][key]['competitions'] = new_comps
+    
     save_config(config)
+    reload_config()
     flash('Configuration updated successfully.')
     return redirect(url_for('admin_dashboard'))
 
@@ -292,6 +294,7 @@ def delete_password():
     if delete_key in config.get('passwords', {}):
         del config['passwords'][delete_key]
         save_config(config)
+        reload_config()
         flash(f'Password entry for "{delete_key}" deleted successfully.')
     else:
         flash(f'No password entry found for key "{delete_key}".')
@@ -303,20 +306,23 @@ def add_password():
     new_key = request.form.get('new_key')
     new_pass = request.form.get('new_password')
     new_perm = request.form.get('new_permissions')
-    new_comps = request.form.get('new_competitions')
+    new_comps = request.form.getlist('new_competitions')  # Changed to getlist for multiple values
     if not (new_key and new_pass and new_perm):
         flash('Missing required fields for new password.')
         return redirect(url_for('admin_dashboard'))
-    if new_comps and new_comps.strip().lower() != 'all':
-        comps = [c.strip() for c in new_comps.split(',') if c.strip()]
-    else:
+    
+    if 'all' in new_comps:
         comps = "all"
+    else:
+        comps = new_comps
+        
     config['passwords'][new_key] = {
         "password": new_pass,
         "permissions": new_perm,
         "competitions": comps
     }
     save_config(config)
+    reload_config()
     flash(f'Password entry for "{new_key}" added successfully.')
     return redirect(url_for('admin_dashboard'))
 

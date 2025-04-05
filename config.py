@@ -49,3 +49,8 @@ def save_config(new_config):
     except OSError as e:
         print("Error writing to config file:", e)
         raise
+
+def reload_config():
+    global config
+    config = load_config()
+    return config

@@ -124,3 +124,16 @@ def create_collection(db_name, collection_name):
             print(f"Error creating collection: {e}")
             return False
     return False
+
+def get_all_competitions():
+    try:
+        client = get_client()
+        if client is None:
+            return [], 500
+        db_names = client.list_database_names()
+        # Filter out system databases
+        competitions = [db for db in db_names if db not in ['admin', 'local', 'config']]
+        return competitions, 200
+    except Exception as e:
+        print(f"Error getting competitions: {e}")
+        return [], 500
