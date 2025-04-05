@@ -4,6 +4,21 @@ from db_handler import fetch_entries, insert_entries, create_database, create_co
 from config import config, save_config
 import os
 import requests
+import logging
+from datetime import datetime
+import json
+from ip2geotools.databases.noncommercial import DbIpCity
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('app.log'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
@@ -26,32 +41,48 @@ def princess_entries(competition_id):
     return handle_entries(competition_id, 'princess')
 
 def handle_entries(competition_id, collection_name):
+    # Get client IP and country
+    client_ip = request.remote_addr
+    country = get_client_country(client_ip)
+    
+    # Get password from headers or JSON
     password = request.headers.get('x-password') or (request.json or {}).get('password')
+    
+    # Log the request
+    logger.info(f"Request received - Method: {request.method}, Path: {request.path}, IP: {client_ip}, Country: {country}, Time: {datetime.now()}, Competition ID: {competition_id}, Collection: {collection_name}")
+    
     role, details = check_password(password)
     if role is None:
+        logger.warning(f"Invalid password attempt from IP: {client_ip}, Country: {country}")
         return jsonify({'message': 'Forbidden: Invalid password'}), 403
 
     allowed_comps = details.get('competitions')
     if allowed_comps != "all" and competition_id not in allowed_comps:
+        logger.warning(f"Unauthorized competition access attempt - IP: {client_ip}, Country: {country}, Competition ID: {competition_id}, Role: {role}")
         return jsonify({'message': 'Forbidden: Access to this competition is not allowed'}), 403
 
     if request.method == 'GET':
         if details.get('permissions') not in ['read-only', 'read-write']:
+            logger.warning(f"Unauthorized read attempt - IP: {client_ip}, Country: {country}, Role: {role}")
             return jsonify({'message': 'Forbidden: Read permission required'}), 403
         entries_data, status_code = fetch_entries(competition_id, collection_name)
+        logger.info(f"Entries fetched successfully - IP: {client_ip}, Country: {country}, Competition ID: {competition_id}, Role: {role}")
         return jsonify(entries_data), status_code
 
     elif request.method == 'POST':
         if details.get('permissions') not in ['write-only', 'read-write']:
+            logger.warning(f"Unauthorized write attempt - IP: {client_ip}, Country: {country}, Role: {role}")
             return jsonify({'message': 'Forbidden: Write permission required'}), 403
         data = request.json
         entries_list = data.get('entries', [])
         if not isinstance(entries_list, list):
+            logger.warning(f"Invalid entries format - IP: {client_ip}, Country: {country}")
             return jsonify({'message': 'Invalid request: entries should be an array'}), 400
         insert_result, status_code = insert_entries(
             competition_id, entries_list, collection_name,
             create_if_not_exists=(details.get('permissions') == 'read-write')
         )
+        logger.info(f"Entries inserted successfully - IP: {client_ip}, Country: {country}, Competition ID: {competition_id}, Role: {role}, Entries Count: {len(entries_list)}")
         return jsonify(insert_result), status_code
 
 # --- API Route for Teams ---
@@ -318,6 +349,14 @@ def add_cors_headers(response):
     response.headers.add('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
     response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,x-password')
     return response
+
+def get_client_country(ip):
+    try:
+        response = DbIpCity.get(ip, api_key='free')
+        return response.country
+    except Exception as e:
+        logger.warning(f"Could not determine country for IP {ip}: {str(e)}")
+        return "Unknown"
 
 if __name__ == "__main__":
     app.run(debug=True) 
