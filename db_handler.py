@@ -137,3 +137,21 @@ def get_all_competitions():
     except Exception as e:
         print(f"Error getting competitions: {e}")
         return [], 500
+
+def get_users_with_access(competition_id, config):
+    users = []
+    for key, details in config.get('passwords', {}).items():
+        if details.get('competitions') == 'all' or competition_id in details.get('competitions', []):
+            users.append(key)
+    return users
+
+def delete_database(db_name):
+    try:
+        client = get_client()
+        if client is None:
+            return False, "Failed to connect to database"
+        client.drop_database(db_name)
+        return True, "Database deleted successfully"
+    except Exception as e:
+        print(f"Error deleting database {db_name}: {e}")
+        return False, str(e)

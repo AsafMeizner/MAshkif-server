@@ -14,6 +14,9 @@
       --input-bg: #3b3b3b;
       --button-bg: #e74c3c;
       --button-hover: #c0392b;
+      --nav-bg: #1a1d23;
+      --nav-active: #e74c3c;
+      --nav-hover: #2a2d33;
     }
     body {
       background-color: var(--bg-color);
@@ -22,6 +25,12 @@
     .card {
       background-color: var(--container-bg);
       color: var(--text-color);
+      border: none;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    .card-header {
+      background-color: var(--nav-bg);
+      border-bottom: 1px solid var(--input-bg);
     }
     .card-header h2, .card-header h5, .card-header h6 {
       color: var(--title-color);
@@ -59,6 +68,67 @@
       border-radius: 0.25rem;
       min-width: 80px;
       text-align: center;
+    }
+    .nav-tabs {
+      border-bottom: 1px solid var(--input-bg);
+    }
+    .nav-tabs .nav-link {
+      color: var(--text-color);
+      background-color: var(--nav-bg);
+      border: 1px solid var(--input-bg);
+      margin-right: 5px;
+    }
+    .nav-tabs .nav-link:hover {
+      background-color: var(--nav-hover);
+      border-color: var(--input-bg);
+    }
+    .nav-tabs .nav-link.active {
+      background-color: var(--nav-active);
+      border-color: var(--nav-active);
+      color: white;
+    }
+    .table {
+      color: var(--text-color);
+    }
+    .table thead th {
+      background-color: var(--nav-bg);
+      border-bottom: 2px solid var(--input-bg);
+      color: var(--text-color);
+    }
+    .table td, .table th {
+      border-top: 1px solid var(--input-bg);
+      background-color: var(--container-bg);
+      color: var(--text-color);
+    }
+    .table tbody tr:hover {
+      background-color: var(--nav-hover);
+    }
+    .accordion-button {
+      background-color: var(--container-bg);
+      color: var(--text-color);
+    }
+    .accordion-button:not(.collapsed) {
+      background-color: var(--nav-bg);
+      color: var(--title-color);
+    }
+    .accordion-button:focus {
+      box-shadow: none;
+      border-color: var(--input-bg);
+    }
+    .accordion-item {
+      background-color: var(--container-bg);
+      border: 1px solid var(--input-bg);
+    }
+    .accordion-body {
+      background-color: var(--container-bg);
+    }
+    .btn-danger {
+      background-color: #dc3545;
+      border-color: #dc3545;
+    }
+    .btn-danger:hover {
+      background-color: #bb2d3b;
+      border-color: #bb2d3b;
     }
     .competition-dropdown {
       background-color: var(--container-bg);
@@ -118,15 +188,70 @@
     .competition-list::-webkit-scrollbar-thumb:hover {
       background: var(--button-hover);
     }
+    .tab-content {
+      padding: 20px 0;
+    }
+    .user-card {
+      margin-bottom: 20px;
+    }
+    .user-card .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .user-card .card-header h6 {
+      margin: 0;
+    }
+    .competition-card {
+      margin-bottom: 15px;
+    }
+    .competition-card .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .accordion-button::after {
+      background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23ffffff'%3e%3cpath fill-rule='evenodd' d='M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z'/%3e%3c/svg%3e");
+    }
+    .action-buttons {
+      display: flex;
+      gap: 8px;
+    }
+    .modal-content {
+      background-color: var(--container-bg);
+      color: var(--text-color);
+    }
+    .modal-header {
+      border-bottom: 1px solid var(--input-bg);
+    }
+    .modal-footer {
+      border-top: 1px solid var(--input-bg);
+    }
+    .btn-close {
+      filter: invert(1) grayscale(100%) brightness(200%);
+    }
+    .text-muted {
+      color: var(--text-color) !important;
+      opacity: 0.7;
+    }
+    .user-badge {
+      background-color: var(--button-bg);
+      color: var(--text-color);
+      padding: 2px 6px;
+      border-radius: 4px;
+      margin: 2px;
+      display: inline-block;
+      font-size: 0.8em;
+    }
   </style>
 </head>
 <body>
   <div class="container mt-4">
-    <div class="d-flex justify-content-between align-items-center">
+    <div class="d-flex justify-content-between align-items-center mb-4">
       <h2>Admin Dashboard</h2>
       <a href="{{ url_for('admin_logout') }}" class="btn btn-custom">Logout</a>
     </div>
-    <hr>
+
     {% with messages = get_flashed_messages() %}
       {% if messages %}
         <div class="alert alert-info">
@@ -137,175 +262,295 @@
       {% endif %}
     {% endwith %}
 
-    <!-- Update Configuration -->
-    <div class="card mb-4">
-      <div class="card-header">
-        <h5>Update Configuration</h5>
-      </div>
-      <div class="card-body">
-        <form action="{{ url_for('update_config') }}" method="POST">
-          <div class="mb-3">
-            <label for="mongo_uri" class="form-label">Mongo URI</label>
-            <input type="text" class="form-control" name="mongo_uri" value="{{ config['MONGO_URI'] }}">
-          </div>
-          <div class="mb-3">
-            <label for="tba_key" class="form-label">The Blue Alliance API Key</label>
-            <input type="text" class="form-control" name="tba_key" value="{{ config['tba_key'] }}">
-            <div class="form-text">Used for fetching team data from The Blue Alliance</div>
-          </div>
-          <h5>Passwords</h5>
-          {% for key, details in config['passwords'].items() %}
-            <div class="mb-3">
-              <label class="form-label">{{ key }} Password</label>
-              <div class="input-group">
-                <input type="text" class="form-control" name="passwords-{{ key }}-password" value="{{ details['password'] }}">
-                <span class="input-group-text toggle-password" onclick="toggleAdminPassword(this)">Show</span>
-              </div>
-            </div>
-            <div class="mb-3">
-              <label class="form-label">Permissions</label>
-              <select class="form-select" name="passwords-{{ key }}-permissions">
-                <option value="read-only" {% if details['permissions'] == 'read-only' %}selected{% endif %}>Read Only</option>
-                <option value="write-only" {% if details['permissions'] == 'write-only' %}selected{% endif %}>Write Only</option>
-                <option value="read-write" {% if details['permissions'] == 'read-write' %}selected{% endif %}>Read & Write</option>
-              </select>
-            </div>
-            <div class="mb-3">
-              <label class="form-label">Competitions</label>
-              <div class="dropdown">
-                <button class="btn btn-custom dropdown-toggle w-100 text-start" type="button" id="compDropdown{{ key }}" data-bs-toggle="dropdown" aria-expanded="false">
-                  {% if details['competitions'] == 'all' %}
-                    All Competitions
-                  {% else %}
-                    {{ details['competitions']|length }} Competition{% if details['competitions']|length != 1 %}s{% endif %} Selected
-                  {% endif %}
-                </button>
-                <div class="dropdown-menu w-100 p-3 competition-dropdown" aria-labelledby="compDropdown{{ key }}">
-                  <div class="form-check">
-                    <input class="form-check-input" type="checkbox" name="passwords-{{ key }}-competitions" value="all" id="allComps{{ key }}" {% if details['competitions'] == 'all' %}checked{% endif %}>
-                    <label class="form-check-label" for="allComps{{ key }}">
-                      All Competitions
-                    </label>
-                  </div>
-                  <hr>
-                  <div class="competition-list" style="max-height: 200px; overflow-y: auto;">
-                    {% for comp in competitions %}
-                      <div class="form-check">
-                        <input class="form-check-input" type="checkbox" name="passwords-{{ key }}-competitions" value="{{ comp }}" id="comp{{ key }}{{ loop.index }}" {% if details['competitions'] != 'all' and comp in details['competitions'] %}checked{% endif %}>
-                        <label class="form-check-label" for="comp{{ key }}{{ loop.index }}">
-                          {{ comp }}
-                        </label>
-                      </div>
-                    {% endfor %}
-                  </div>
-                </div>
-              </div>
-            </div>
-            <hr>
-          {% endfor %}
-          <button type="submit" class="btn btn-custom">Update Configuration</button>
-        </form>
-      </div>
-    </div>
+    <!-- Navigation Tabs -->
+    <ul class="nav nav-tabs" id="adminTabs" role="tablist">
+      <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="config-tab" data-bs-toggle="tab" data-bs-target="#config" type="button" role="tab">Configuration</button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="users-tab" data-bs-toggle="tab" data-bs-target="#users" type="button" role="tab">Users</button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="competitions-tab" data-bs-toggle="tab" data-bs-target="#competitions" type="button" role="tab">Competitions</button>
+      </li>
+    </ul>
 
-    <!-- Add New Password -->
-    <div class="card mb-4">
-      <div class="card-header">
-        <h5>Add New Password</h5>
+    <!-- Tab Content -->
+    <div class="tab-content" id="adminTabsContent">
+      <!-- Configuration Tab -->
+      <div class="tab-pane fade show active" id="config" role="tabpanel">
+        <div class="card">
+          <div class="card-header">
+            <h5>System Configuration</h5>
+          </div>
+          <div class="card-body">
+            <form action="{{ url_for('update_config') }}" method="POST">
+              <div class="mb-3">
+                <label for="mongo_uri" class="form-label">Mongo URI</label>
+                <input type="text" class="form-control" name="mongo_uri" value="{{ config['MONGO_URI'] }}">
+              </div>
+              <div class="mb-3">
+                <label for="tba_key" class="form-label">The Blue Alliance API Key</label>
+                <input type="text" class="form-control" name="tba_key" value="{{ config['tba_key'] }}">
+                <div class="form-text">Used for fetching team data from The Blue Alliance</div>
+              </div>
+              <button type="submit" class="btn btn-custom">Update Configuration</button>
+            </form>
+          </div>
+        </div>
       </div>
-      <div class="card-body">
-        <form action="{{ url_for('add_password') }}" method="POST">
-          <div class="mb-3">
-            <label class="form-label">Identifier (Key)</label>
-            <input type="text" class="form-control" name="new_key" required>
+
+      <!-- Users Tab -->
+      <div class="tab-pane fade" id="users" role="tabpanel">
+        <!-- Existing Users -->
+        <div class="card mb-4">
+          <div class="card-header">
+            <h5>Manage Users</h5>
           </div>
-          <div class="mb-3">
-            <label class="form-label">Password</label>
-            <div class="input-group">
-              <input type="text" class="form-control" name="new_password" required>
-              <span class="input-group-text toggle-password" onclick="toggleAdminPassword(this)">Show</span>
-            </div>
-          </div>
-          <div class="mb-3">
-            <label class="form-label">Permissions</label>
-            <select class="form-select" name="new_permissions" required>
-              <option value="read-only">Read Only</option>
-              <option value="write-only">Write Only</option>
-              <option value="read-write" selected>Read & Write</option>
-            </select>
-          </div>
-          <div class="mb-3">
-            <label class="form-label">Competitions</label>
-            <div class="dropdown">
-              <button class="btn btn-custom dropdown-toggle w-100 text-start" type="button" id="newCompDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                All Competitions
-              </button>
-              <div class="dropdown-menu w-100 p-3 competition-dropdown" aria-labelledby="newCompDropdown">
-                <div class="form-check">
-                  <input class="form-check-input" type="checkbox" name="new_competitions" value="all" id="allNewComps" checked>
-                  <label class="form-check-label" for="allNewComps">
-                    All Competitions
-                  </label>
-                </div>
-                <hr>
-                <div class="competition-list" style="max-height: 200px; overflow-y: auto;">
-                  {% for comp in competitions %}
-                    <div class="form-check">
-                      <input class="form-check-input" type="checkbox" name="new_competitions" value="{{ comp }}" id="newComp{{ loop.index }}">
-                      <label class="form-check-label" for="newComp{{ loop.index }}">
-                        {{ comp }}
-                      </label>
+          <div class="card-body">
+            <div class="accordion" id="usersAccordion">
+              {% for key, details in config['passwords'].items() %}
+                <div class="accordion-item">
+                  <h2 class="accordion-header" id="heading{{ key }}">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ key }}">
+                      {{ key }}
+                      <span class="ms-2 badge bg-secondary">{{ details['permissions'] }}</span>
+                    </button>
+                  </h2>
+                  <div id="collapse{{ key }}" class="accordion-collapse collapse" data-bs-parent="#usersAccordion">
+                    <div class="accordion-body">
+                      <form action="{{ url_for('update_config') }}" method="POST">
+                        <div class="mb-3">
+                          <label class="form-label">Role Name</label>
+                          <input type="text" class="form-control" name="passwords-{{ key }}-role" value="{{ key }}">
+                        </div>
+                        <div class="mb-3">
+                          <label class="form-label">Password</label>
+                          <div class="input-group">
+                            <input type="text" class="form-control" name="passwords-{{ key }}-password" value="{{ details['password'] }}">
+                            <span class="input-group-text toggle-password" onclick="toggleAdminPassword(this)">Show</span>
+                          </div>
+                        </div>
+                        <div class="mb-3">
+                          <label class="form-label">Permissions</label>
+                          <select class="form-select" name="passwords-{{ key }}-permissions">
+                            <option value="read-only" {% if details['permissions'] == 'read-only' %}selected{% endif %}>Read Only</option>
+                            <option value="write-only" {% if details['permissions'] == 'write-only' %}selected{% endif %}>Write Only</option>
+                            <option value="read-write" {% if details['permissions'] == 'read-write' %}selected{% endif %}>Read & Write</option>
+                          </select>
+                        </div>
+                        <div class="mb-3">
+                          <label class="form-label">Competitions</label>
+                          <div class="dropdown">
+                            <button class="btn btn-custom dropdown-toggle w-100 text-start" type="button" id="compDropdown{{ key }}" data-bs-toggle="dropdown" aria-expanded="false">
+                              {% if details['competitions'] == 'all' %}
+                                All Competitions
+                              {% else %}
+                                {{ details['competitions']|length }} Competition{% if details['competitions']|length != 1 %}s{% endif %} Selected
+                              {% endif %}
+                            </button>
+                            <div class="dropdown-menu w-100 p-3 competition-dropdown" aria-labelledby="compDropdown{{ key }}">
+                              <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="passwords-{{ key }}-competitions" value="all" id="allComps{{ key }}" {% if details['competitions'] == 'all' %}checked{% endif %}>
+                                <label class="form-check-label" for="allComps{{ key }}">
+                                  All Competitions
+                                </label>
+                              </div>
+                              <hr>
+                              <div class="competition-list" style="max-height: 200px; overflow-y: auto;">
+                                {% for comp in competitions %}
+                                  <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="passwords-{{ key }}-competitions" value="{{ comp }}" id="comp{{ key }}{{ loop.index }}" {% if details['competitions'] != 'all' and comp in details['competitions'] %}checked{% endif %}>
+                                    <label class="form-check-label" for="comp{{ key }}{{ loop.index }}">
+                                      {{ comp }}
+                                    </label>
+                                  </div>
+                                {% endfor %}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                          <button type="submit" class="btn btn-custom">Update User</button>
+                          <button type="button" class="btn btn-danger" onclick="confirmDeleteUser('{{ key }}')">Delete User</button>
+                        </div>
+                      </form>
                     </div>
-                  {% endfor %}
+                  </div>
                 </div>
+              {% endfor %}
+            </div>
+
+            <!-- Add New User -->
+            <div class="card mt-4">
+              <div class="card-header">
+                <h5>Add New User</h5>
+              </div>
+              <div class="card-body">
+                <form action="{{ url_for('add_password') }}" method="POST">
+                  <div class="mb-3">
+                    <label class="form-label">Role Name</label>
+                    <input type="text" class="form-control" name="new_key" required>
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label">Password</label>
+                    <div class="input-group">
+                      <input type="text" class="form-control" name="new_password" required>
+                      <span class="input-group-text toggle-password" onclick="toggleAdminPassword(this)">Show</span>
+                    </div>
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label">Permissions</label>
+                    <select class="form-select" name="new_permissions" required>
+                      <option value="read-only">Read Only</option>
+                      <option value="write-only">Write Only</option>
+                      <option value="read-write" selected>Read & Write</option>
+                    </select>
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label">Competitions</label>
+                    <div class="dropdown">
+                      <button class="btn btn-custom dropdown-toggle w-100 text-start" type="button" id="newCompDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                        All Competitions
+                      </button>
+                      <div class="dropdown-menu w-100 p-3 competition-dropdown" aria-labelledby="newCompDropdown">
+                        <div class="form-check">
+                          <input class="form-check-input" type="checkbox" name="new_competitions" value="all" id="allNewComps" checked>
+                          <label class="form-check-label" for="allNewComps">
+                            All Competitions
+                          </label>
+                        </div>
+                        <hr>
+                        <div class="competition-list" style="max-height: 200px; overflow-y: auto;">
+                          {% for comp in competitions %}
+                            <div class="form-check">
+                              <input class="form-check-input" type="checkbox" name="new_competitions" value="{{ comp }}" id="newComp{{ loop.index }}">
+                              <label class="form-check-label" for="newComp{{ loop.index }}">
+                                {{ comp }}
+                              </label>
+                            </div>
+                          {% endfor %}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <button type="submit" class="btn btn-custom">Add User</button>
+                </form>
               </div>
             </div>
           </div>
-          <button type="submit" class="btn btn-custom">Add Password</button>
-        </form>
+        </div>
       </div>
-    </div>
 
-    <!-- Delete Password -->
-    <div class="card mb-4">
-      <div class="card-header">
-        <h5>Delete Password</h5>
-      </div>
-      <div class="card-body">
-        <form action="{{ url_for('delete_password') }}" method="POST">
-          <div class="mb-3">
-            <label class="form-label">Select Password Key to Delete</label>
-            <select class="form-select" name="delete_key" required>
-              {% for key in config['passwords'].keys() %}
-                <option value="{{ key }}">{{ key }}</option>
-              {% endfor %}
-            </select>
+      <!-- Competitions Tab -->
+      <div class="tab-pane fade" id="competitions" role="tabpanel">
+        <!-- Create Competition -->
+        <div class="card mb-4">
+          <div class="card-header">
+            <h5>Create New Competition</h5>
           </div>
-          <button type="submit" class="btn btn-custom">Delete Password</button>
-        </form>
-      </div>
-    </div>
+          <div class="card-body">
+            <form action="{{ url_for('admin_create_competition') }}" method="POST">
+              <div class="mb-3">
+                <label class="form-label">Competition ID</label>
+                <input type="text" class="form-control" name="competition_id" required>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Optional: Collections (comma separated)</label>
+                <input type="text" class="form-control" name="collections" placeholder="e.g. entries, princess">
+              </div>
+              <button type="submit" class="btn btn-custom">Create Competition</button>
+            </form>
+          </div>
+        </div>
 
-    <!-- Create Competition -->
-    <div class="card mb-4">
-      <div class="card-header">
-        <h5>Create Competition</h5>
-      </div>
-      <div class="card-body">
-        <form action="{{ url_for('admin_create_competition') }}" method="POST">
-          <div class="mb-3">
-            <label class="form-label">Competition ID</label>
-            <input type="text" class="form-control" name="competition_id" required>
+        <!-- Existing Competitions -->
+        <div class="card">
+          <div class="card-header">
+            <h5>Existing Competitions</h5>
           </div>
-          <div class="mb-3">
-            <label class="form-label">Optional: Collections (comma separated)</label>
-            <input type="text" class="form-control" name="collections" placeholder="e.g. entries, princess">
+          <div class="card-body">
+            <div class="table-responsive">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Competition ID</th>
+                    <th>Users with Access</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for comp in competitions %}
+                    <tr>
+                      <td>{{ comp }}</td>
+                      <td>
+                        {% set users = get_users_with_access(comp, config) %}
+                        {% if users %}
+                          {% for user in users %}
+                            <span class="user-badge">{{ user }}</span>
+                          {% endfor %}
+                        {% else %}
+                          <span class="text-muted">No users</span>
+                        {% endif %}
+                      </td>
+                      <td>
+                        <div class="action-buttons">
+                          <button class="btn btn-sm btn-custom" onclick="addCollection('{{ comp }}')">Add Collection</button>
+                          <button class="btn btn-sm btn-danger" onclick="confirmDeleteCompetition('{{ comp }}')">Delete</button>
+                        </div>
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
           </div>
-          <button type="submit" class="btn btn-custom">Create Competition</button>
-        </form>
+        </div>
       </div>
     </div>
   </div>
+
+  <!-- Delete User Modal -->
+  <div class="modal fade" id="deleteUserModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Delete User</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p>Are you sure you want to delete this user? This action cannot be undone.</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <form id="deleteUserForm" method="POST" action="{{ url_for('delete_password') }}">
+            <input type="hidden" name="delete_key" id="deleteUserKey">
+            <button type="submit" class="btn btn-danger">Delete</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete Competition Modal -->
+  <div class="modal fade" id="deleteCompetitionModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Delete Competition</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p>Are you sure you want to delete this competition? This action cannot be undone.</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-danger" id="confirmDeleteCompetition">Delete</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Scripts -->
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
@@ -348,11 +593,9 @@
           const button = dropdown.querySelector('.btn');
           
           if (this.checked) {
-            // When "All" is checked, check all other checkboxes
             otherCheckboxes.forEach(cb => cb.checked = true);
             button.textContent = 'All Competitions';
           } else {
-            // When "All" is unchecked, uncheck all other checkboxes
             otherCheckboxes.forEach(cb => cb.checked = false);
             button.textContent = '0 Competitions Selected';
           }
@@ -367,9 +610,7 @@
           const otherCheckboxes = dropdown.querySelectorAll('input[type="checkbox"]:not([value="all"])');
           const button = dropdown.querySelector('.btn');
           
-          // If "All" was checked and we're unchecking a competition
           if (allCheckbox.checked && !this.checked) {
-            // Uncheck "All" and check all other competitions except this one
             allCheckbox.checked = false;
             otherCheckboxes.forEach(cb => {
               if (cb !== this) {
@@ -385,25 +626,14 @@
           const totalCount = otherCheckboxes.length;
           
           if (selectedCount === totalCount) {
-            // If all individual checkboxes are checked, check "All" and uncheck others
             allCheckbox.checked = true;
             otherCheckboxes.forEach(cb => cb.checked = false);
             button.textContent = 'All Competitions';
           } else {
-            // If not all are checked, uncheck "All" and show count
             allCheckbox.checked = false;
             button.textContent = selectedCount + ' Competition' + (selectedCount !== 1 ? 's' : '') + ' Selected';
           }
         });
-      });
-
-      // Close dropdown when clicking outside
-      document.addEventListener('click', function(e) {
-        if (!e.target.closest('.dropdown')) {
-          document.querySelectorAll('.dropdown-menu').forEach(menu => {
-            menu.classList.remove('show');
-          });
-        }
       });
     });
 
@@ -416,6 +646,64 @@
         input.type = 'text';
         element.textContent = 'Hide';
       }
+    }
+
+    function addCollection(competitionId) {
+      const collectionName = prompt('Enter collection name:');
+      if (collectionName) {
+        // Make an AJAX call to create the collection
+        fetch(`/admin/add_collection/${competitionId}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ collection_name: collectionName })
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            location.reload();
+          } else {
+            alert('Failed to create collection: ' + data.message);
+          }
+        })
+        .catch(error => {
+          alert('Error creating collection: ' + error);
+        });
+      }
+    }
+
+    function confirmDeleteUser(key) {
+      document.getElementById('deleteUserKey').value = key;
+      new bootstrap.Modal(document.getElementById('deleteUserModal')).show();
+    }
+
+    function confirmDeleteCompetition(competitionId) {
+      const modal = new bootstrap.Modal(document.getElementById('deleteCompetitionModal'));
+      modal.show();
+      
+      document.getElementById('confirmDeleteCompetition').onclick = function() {
+        fetch(`/admin/delete_competition/${competitionId}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            location.reload();
+          } else {
+            alert('Failed to delete competition: ' + data.message);
+          }
+        })
+        .catch(error => {
+          alert('Error deleting competition: ' + error);
+        })
+        .finally(() => {
+          modal.hide();
+        });
+      };
     }
   </script>
 </body>

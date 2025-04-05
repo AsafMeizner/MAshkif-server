@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify, render_template, redirect, url_for, session, flash
 from flask_cors import CORS
-from db_handler import fetch_entries, insert_entries, create_database, create_collection, get_all_competitions
+from db_handler import fetch_entries, insert_entries, create_database, create_collection, get_all_competitions, get_users_with_access, delete_database
 from config import config, save_config, reload_config
 import os
 import requests
@@ -255,7 +255,10 @@ def admin_required(func):
 @admin_required
 def admin_dashboard():
     competitions, _ = get_all_competitions()
-    return render_template('admin_dashboard.html', config=config, competitions=competitions)
+    return render_template('admin_dashboard.html', 
+                         config=config, 
+                         competitions=competitions,
+                         get_users_with_access=get_users_with_access)
 
 @app.route('/admin/update_config', methods=['POST'])
 @admin_required
@@ -349,6 +352,29 @@ def admin_create_competition():
         flash(f'Failed to create competition "{competition_id}".')
     return redirect(url_for('admin_dashboard'))
 
+@app.route('/admin/add_collection/<competition_id>', methods=['POST'])
+@admin_required
+def add_collection(competition_id):
+    try:
+        data = request.get_json()
+        collection_name = data.get('collection_name')
+        if not collection_name:
+            return jsonify({'success': False, 'message': 'Collection name is required'}), 400
+        
+        result = create_collection(competition_id, collection_name)
+        if result:
+            return jsonify({'success': True, 'message': f'Collection {collection_name} created successfully'})
+        else:
+            return jsonify({'success': False, 'message': 'Failed to create collection'}), 500
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/admin/delete_competition/<competition_id>', methods=['POST'])
+@admin_required
+def delete_competition(competition_id):
+    success, message = delete_database(competition_id)
+    return jsonify({'success': success, 'message': message})
+
 @app.after_request
 def add_cors_headers(response):
     response.headers.add('Access-Control-Allow-Origin', '*')
@@ -363,6 +389,17 @@ def get_client_country(ip):
     except Exception as e:
         logger.warning(f"Could not determine country for IP {ip}: {str(e)}")
         return "Unknown"
+
+def get_competition_collections(competition_id):
+    try:
+        client = get_client()
+        if client is None:
+            return []
+        db = client[competition_id]
+        return db.list_collection_names()
+    except Exception as e:
+        print(f"Error getting collections for competition {competition_id}: {e}")
+        return []
 
 if __name__ == "__main__":
     app.run(debug=True) 
